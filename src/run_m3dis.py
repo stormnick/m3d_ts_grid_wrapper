@@ -73,7 +73,7 @@ def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, co
 &io_params          datadir='{temp_path}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims=1 save_atmos=T atmos_file='{atmo_model_path}' {atmo_param}/\n{atom_params}\
-&m3d_params         decouple_continuum=T verbose=2 n_nu=1 maxiter={iterations_max} quad_scheme='set_a2'/\n\
+&m3d_params         decouple_continuum=T verbose=2 n_nu=1 maxiter={iterations_max}/\n\
 &spectrum_params    daa=0.1 aa_blue=5000 aa_red=5001 /\n\
 &composition_params isotope_file='{temp_path}/../../isotopes' abund_file='{temp_path}/../../abund_to_use' {absmet_file}/\n\
 &task_list_params   hash_table_size={hash_table_size} /\n")

@@ -132,7 +132,7 @@ def choose_absmet_file(absmet_file_global_path, metallicity):
     # absmet_file = f"absmet_file='{os.path.join(self.departure_file_path, '')}' absmet_big_end=T"
     return absmet_file
 
-def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path, convlim, iterations_max, use_absmet, absmet_global_path, hash_table_size, use_precomputed_depart=False, verbose=True):
+def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path, convlim, iterations_max, use_absmet, absmet_global_path, hash_table_size, use_precomputed_depart=False, verbose=False):
     #job = setup_multi_job(job, temporary_directory)
     atmo_path = os.path.join(atmos_path, atmo)
 
