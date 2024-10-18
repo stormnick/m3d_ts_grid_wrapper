@@ -119,13 +119,15 @@ def choose_absmet_file(absmet_file_global_path, metallicity):
         absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost -4
-    elif np.abs(metallicity + 4) < 0.01:
+    elif np.abs(metallicity + 4) < 0.01 or np.abs(metallicity + 5) < 0.01:
         absmet_file = f"OPACITIES/M-4.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost +0.5
-    elif np.abs(metallicity - 0.5) < 0.01:
+    elif np.abs(metallicity - 0.5) < 0.01 or np.abs(metallicity - 1) < 0.01:
         absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}'  absmet_big_end=F"
+    else:
+        absmet_file = ""
     #    &composition_params absmet_file='/u/nisto/data/absmet//m1/metals.x01' absmet_big_end=T /
     # absmet_file = f"absmet_file='{os.path.join(self.departure_file_path, '')}' absmet_big_end=T"
     return absmet_file
