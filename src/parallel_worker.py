@@ -102,29 +102,29 @@ def choose_absmet_file(absmet_file_global_path, metallicity):
     # check if feh is almost 0
     #absmet_file_global_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/"
     #absmet_file_global_path = "/Users/storm/PhD_2022-2025/m3dis_useful_stuff/absmet_files/"
-    if np.abs(metallicity) < 0.01:
+    if np.abs(metallicity) < 0.01 or np.abs(metallicity + 1) < 0.01 or np.abs(metallicity + 0.5) < 0.01 or np.abs(metallicity + 0.25) < 0.01:
         # /mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00
-        absmet_file = f"OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost -1 or -0.5
-    elif np.abs(metallicity + 1) < 0.01 or np.abs(metallicity + 0.5) < 0.01:
-        absmet_file = f"m-1.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals.x01"
-        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=T"
+    #elif np.abs(metallicity + 1) < 0.01 or np.abs(metallicity + 0.5) < 0.01:
+    #    absmet_file = f"m-1.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals.x01"
+    #    absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=T"
     # check if feh is almost -2
     elif np.abs(metallicity + 2) < 0.01:
-        absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost -3
     elif np.abs(metallicity + 3) < 0.01:
-        absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost -4
     elif np.abs(metallicity + 4) < 0.01 or np.abs(metallicity + 5) < 0.01:
-        absmet_file = f"OPACITIES/M-4.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"/M-4.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
     # check if feh is almost +0.5
-    elif np.abs(metallicity - 0.5) < 0.01 or np.abs(metallicity - 1) < 0.01:
-        absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+    elif np.abs(metallicity - 0.5) < 0.01 or np.abs(metallicity - 1) < 0.01 or np.abs(metallicity - 0.25) < 0.01:
+        absmet_file = f"/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
         absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}'  absmet_big_end=F"
     else:
         absmet_file = ""
