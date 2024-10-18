@@ -43,7 +43,7 @@ def collect_output(folder_to_collect_from, atom_id, atom_comment, jobs_amount):
         pointer = len(header) + 1
 
         for bin_file in bin_files:
-            aux_file = bin_file.replace(".bin", ".dat")
+            aux_file = bin_file.replace(".bin", ".aux")
             if aux_file in done_ts_file_names:
                 continue
             done_ts_file_names.add(aux_file)
@@ -53,17 +53,17 @@ def collect_output(folder_to_collect_from, atom_id, atom_comment, jobs_amount):
                     line = line.split()
                     atmo_name, teff, logg, feh, alpha, mass, vmic, abund, length_pointer = line
                     com_aux.write(
-                        " '%s' %10.4f %10.4f %10.4f %10.4f %10.2f %10.2f %10.4f %60.0f \n"
+                        " %s %10.4f %10.4f %10.4f %10.4f %10.2f %10.2f %10.4f %60.0f \n"
                         % (
                             atmo_name,
-                            teff,
-                            logg,
-                            feh,
-                            alpha,
-                            mass,
-                            vmic,
-                            abundance,
-                            pointer,
+                            float(teff),
+                            float(logg),
+                            float(feh),
+                            float(alpha),
+                            float(mass),
+                            float(vmic),
+                            float(abund),
+                            int(pointer),
                         )
                     )
                     pointer += int(length_pointer)
