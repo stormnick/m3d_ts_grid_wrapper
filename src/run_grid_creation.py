@@ -320,5 +320,4 @@ if __name__ == '__main__':
     client.close()
 
     #setup.njobs = jobs_amount
-    exit()
-    collect_output(setup, all_futures_combined, jobs_amount)
+    collect_output(setup.common_wd + '/temporary_grid/',  setup.atom_id, setup.atom_comment, jobs_amount)

@@ -2,10 +2,9 @@ import os
 import shutil
 import numpy as np
 import datetime
-from dask.distributed import get_worker
-import pickle
 from run_m3dis import synthesize_spectra
 from convert_grid_to_ts import *
+import glob
 
 
 def mkdir(s):
@@ -13,87 +12,62 @@ def mkdir(s):
         shutil.rmtree(s)
     os.mkdir(s)
 
-def collect_output(setup, jobs, jobs_amount):
+def collect_output(folder_to_collect_from, atom_id, atom_comment, jobs_amount):
     today = datetime.date.today().strftime("%b-%d-%Y")
 
-    written_comment_ew = False
-    written_comment_aux = False
-
-    done_ew_file_names = set()
     done_ts_file_names = set()
 
     # order of the job:
     # job = [job.output['file_ew'], job.output['file_4ts'], job.output['file_4ts_aux']]
 
-    """ Collect all EW grids into one """
-    datetime0 = datetime.datetime.now()
-    if setup.write_ew > 0:
-        print("Collecting grids of EWs")
-        with open(os.path.join(setup.common_wd, 'output_EWgrid_%s.dat' % (today)), 'w') as com_f:
-            for job in jobs:
-                ew_file = job[0]
-                if ew_file not in done_ew_file_names:
-                    data = open(ew_file, 'r').readlines()
-                    com_f.writelines(data)
-                    done_ew_file_names.add(ew_file)
-        """ Checks to raise warnings if there're repeating entrances """
-        with open(os.path.join(setup.common_wd, 'output_EWgrid_%s.dat' % (today)), 'r') as f:
-            data_all = f.readlines()
-        params = []
-        for line in data_all:
-            if not line.startswith('#'):
-                abund = line.split()[3]
-                atmosID = line.split()[-1]
-                wave = line.split()[6]
-                if not [wave, abund, atmosID] in params:
-                    params.append([wave, abund, atmosID])
-                else:
-                    print("WARNING: found repeating entrance at \n %s AA  A(X)=%s, atmos: %s " \
-                          % (wave, abund, atmosID))
-        datetime1 = datetime.datetime.now()
-        print(datetime1 - datetime0)
-        print(10 * "-")
-        """ #TODO sort the grids of EWs """
+    # get all filenames in the folder that end with .bin
+    bin_files = glob.glob(folder_to_collect_from + '/*.bin')
 
     """ Collect all TS formatted NLTE grids into one """
     datetime0 = datetime.datetime.now()
-    if setup.write_ts > 0:
+    if True:
         print("Collecting TS formatted NLTE grids")
-        com_f = open(os.path.join(setup.common_wd, 'output_NLTEgrid4TS_%s.bin' % (today)), 'wb')
-        com_aux = open(os.path.join(setup.common_wd, 'auxData_NLTEgrid4TS_%s.dat' % (today)), 'w')
+        com_f = open(os.path.join(folder_to_collect_from, '../output_NLTEgrid4TS_%s.bin' % (today)), 'wb')
+        com_aux = open(os.path.join(folder_to_collect_from, '../auxData_NLTEgrid4TS_%s.dat' % (today)), 'w')
+        com_aux.write("#atmos ID, Teff [K], log(g) [cgs], [Fe/H], [alpha/Fe], mass, Vturb [km/s], A(X), pointer\n")
 
         header = "NLTE grid (grid of departure coefficients) in TurboSpectrum format. \nAccompanied by an auxilarly file and model atom. \n" + \
-                 "NLTE element: %s \n" % (setup.atom.element) + \
-                 "Model atom: %s \n" % (setup.atom_id) + \
-                 "Comments: '%s' \n" % (setup.atom.info) + \
+                 "Model atom: %s \n" % (atom_id) + \
+                 "Comments: '%s' \n" % (atom_comment) + \
                  "Number of records: %10.0f \n" % (jobs_amount) + \
-                 f"Computed with MULTI 1D (using EkaterinaSe/wrapper_multi (github)), {today} \n"
+                 f"Computed with DISPATCH@MULTI 3D (using stormnick/m3d_ts_grid_wrapper (github)), {today} \n"
         header = str.encode('%1000s' % (header))
         com_f.write(header)
 
         # Fortran starts with 1 while Python starts with 0
         pointer = len(header) + 1
 
-        for job in jobs:
-            ts_bin_file = job[1]
-            if ts_bin_file not in done_ts_file_names:
-                # departure coefficients in binary format
-                done_ts_file_names.add(ts_bin_file)
-                with open(ts_bin_file, 'rb') as f:
-                    com_f.write(f.read())
-                for line in open(job[2], 'r').readlines():
-                    if not line.startswith('#'):
-                        rec_len = int(line.split()[-1])
-                        com_aux.write('    '.join(line.split()[0:-1]))
-                        com_aux.write("%20.0f \n" % (pointer))
-                        pointer = pointer + rec_len
-                    # simply copy comment lines
-                    else:
-                        if not written_comment_aux:
-                            com_aux.write(line)
-                            written_comment_aux = True
-                        else:
-                            pass
+        for bin_file in bin_files:
+            aux_file = bin_file.replace(".bin", ".dat")
+            if aux_file in done_ts_file_names:
+                continue
+            done_ts_file_names.add(aux_file)
+            with open(bin_file, 'rb') as f:
+                for line in open(aux_file, 'r').readlines():
+                    # split line into parts. replace last part by pointer
+                    line = line.split()
+                    atmo_name, teff, logg, feh, alpha, mass, vmic, abund, length_pointer = line
+                    com_aux.write(
+                        " '%s' %10.4f %10.4f %10.4f %10.4f %10.2f %10.2f %10.4f %60.0f \n"
+                        % (
+                            atmo_name,
+                            teff,
+                            logg,
+                            feh,
+                            alpha,
+                            mass,
+                            vmic,
+                            abundance,
+                            pointer,
+                        )
+                    )
+                    pointer += int(length_pointer)
+                com_f.write(f.read())
 
         com_f.close()
         com_aux.close()
@@ -165,10 +139,11 @@ def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path
 
     atom_path = os.path.join(temporary_directory, "atom.my_atom")
     # random number
-    random_number = str(np.random.random())
+    date_today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
+    random_number = f"{date_today}_{str(np.random.random())}"
     m3d_path_run = os.path.join(temporary_directory, "temp_directory_for_m3d", random_number)
     os.makedirs(m3d_path_run)
-    temporary_grid_save_aux_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.txt")
+    temporary_grid_save_aux_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.aux")
     temporary_grid_save_bin_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.bin")
 
     if use_absmet:
