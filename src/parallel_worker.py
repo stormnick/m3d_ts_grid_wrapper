@@ -5,228 +5,13 @@ import datetime
 from dask.distributed import get_worker
 import pickle
 from run_m3dis import synthesize_spectra
+from convert_grid_to_ts import *
 
 
 def mkdir(s):
     if os.path.isdir(s):
         shutil.rmtree(s)
     os.mkdir(s)
-
-
-
-def assign_temporary_directory(setup):
-    worker = get_worker()
-    try:
-        _ = worker.temporary_directory
-    except AttributeError:
-        worker.temporary_directory = f"{setup.common_wd}/job_{np.random.random()}/"
-        setup_temp_dirs(setup, worker.temporary_directory)
-    try:
-        _ = worker.atom_body
-    except AttributeError:
-        with open(os.path.join(setup.common_wd, "pickled_atom"), 'rb') as atom_pickled_body:
-            worker.atom_body = pickle.load(atom_pickled_body)
-
-
-def setup_temp_dirs(setup, temporary_directory):
-    """
-    Setting up and running an individual serial job of NLTE calculations
-    for a set of model atmospheres (stored in setup.jobs[k]['atmos'])
-    Several indidvidual jobs can be run in parallel, set ncpu in the config. file
-    to the desired number of processes
-    Note: Multi 1D expects all input files to be named only in upper case
-
-    input:
-    # TODO:
-    (string) directory: common working directory, default: "./"
-    (integer) k: an ID of an individual job within the run
-    (object) setup: object of class setup, regulates a setup for the whole run
-    """
-
-    """
-    Make sure that only one process at a time can access input files
-    """
-    # lock = multiprocessing.Lock()
-    # lock.acquire()
-
-    """ Make a temporary directory """
-    mkdir(temporary_directory)
-
-    """ Link input files to a temporary directory """
-    for file in ['absmet', 'abslin', 'absdat']:
-        os.symlink(os.path.join(setup.m1d_input, file), os.path.join(temporary_directory, file.upper()))
-
-    """ Link INPUT file (M1D input file complimenting the model atom) """
-    os.symlink(setup.m1d_input_file, os.path.join(temporary_directory, 'INPUT'))
-
-    """ Link executable """
-    os.symlink(setup.m1d_exe, os.path.join(temporary_directory, 'mul23lus.x'))
-
-    """
-    What kind of output from M1D should be saved?
-    Read from the config file, passed here through the object setup
-    """
-    #job.output.update({'write_ew': setup.write_ew, 'write_ts': setup.write_ts})
-    """ Save EWs """
-    if setup.write_ew == 1 or setup.write_ew == 2:
-        # create file to dump output
-        #job.output.update({'file_ew': temporary_directory + '/output_EW.dat'})
-        with open(os.path.join(temporary_directory, 'output_EW.dat'), 'w') as f:
-            f.write(
-                "# Teff [K], log(g) [cgs], [Fe/H], A(X), stat. weight g_i, energy en_i, wavelength air [AA], osc. strength, EW(NLTE) [AA], EW(LTE) [AA], Vturb [km/s]    \n")
-
-    elif setup.write_ew == 0:
-        pass
-    else:
-        print("write_ew flag unrecognised, stoppped")
-        exit(1)
-
-    """ Output for TS? """
-    if setup.write_ts == 1:
-        # create a file to dump output from this serial job
-        # array rec_len stores a length of the record in bytes
-        #job.output.update({'file_4ts': temporary_directory + '/output_4TS.bin', \
-        #                   'file_4ts_aux': temporary_directory + '/auxdata_4TS.txt', \
-        #                   'rec_len': np.zeros(len(job.atmos), dtype=int)})
-        # create the files
-        with open(os.path.join(temporary_directory, 'output_4TS.bin'), 'wb') as f:
-            pass
-        with open(os.path.join(temporary_directory, 'auxdata_4TS.txt'), 'w') as f:
-            f.write("# atmos ID, Teff [K], log(g) [cgs], [Fe/H], [alpha/Fe], mass, Vturb [km/s], A(X), pointer \n")
-    elif setup.write_ts == 0:
-        pass
-    else:
-        print("write_ts flag unrecognised, stopped")
-        exit(1)
-    #job.output.update({'save_idl1': setup.save_idl1})
-    #if setup.save_idl1 == 1:
-    #    job.output.update({'idl1_folder': setup.idl1_folder})
-
-    # lock.release()
-    #return job
-
-def setup_multi_job(setup, job, temporary_directory):
-    """
-    Setting up and running an individual serial job of NLTE calculations
-    for a set of model atmospheres (stored in setup.jobs[k]['atmos'])
-    Several indidvidual jobs can be run in parallel, set ncpu in the config. file
-    to the desired number of processes
-    Note: Multi 1D expects all input files to be named only in upper case
-
-    input:
-    # TODO:
-    (string) directory: common working directory, default: "./"
-    (integer) k: an ID of an individual job within the run
-    (object) setup: object of class setup, regulates a setup for the whole run
-    """
-
-    """
-    Make sure that only one process at a time can access input files
-    """
-    #lock = multiprocessing.Lock()
-    #lock.acquire()
-
-    #mkdir(temporary_directory)
-
-    job.output.update({'write_ew': setup.write_ew, 'write_ts': setup.write_ts})
-    """ Save EWs """
-    if job.output['write_ew'] == 1 or job.output['write_ew'] == 2:
-        # create file to dump output
-        job.output.update({'file_ew': temporary_directory + '/output_EW.dat'})
-    else:
-        job.output['file_ew'] = None
-
-    """ Output for TS? """
-    if job.output['write_ts'] == 1:
-        # create a file to dump output from this serial job
-        # array rec_len stores a length of the record in bytes
-        job.output.update({'file_4ts': temporary_directory + '/output_4TS.bin', \
-                           'file_4ts_aux': temporary_directory + '/auxdata_4TS.txt', \
-                           'rec_len': np.zeros(len(job.atmo), dtype=int)})
-
-    job.output.update({'save_idl1': setup.save_idl1})
-    if setup.save_idl1 == 1:
-        job.output.update({'idl1_folder': setup.idl1_folder})
-
-    #lock.release()
-    return job
-
-
-def run_multi(job, atom, atmos, temporary_directory, common_wd, atom_body):
-    """
-    Run MULTI1D
-    input:
-    (object) setup:
-    (object) job:
-    (integer) i: index pointing to the current model atmosphere and abundance
-                 (in job.atmos, job.abund)
-                 this model atmosphere and abund will be used to run M1D
-    (object) atom:  object of class model_atom
-    """
-
-    """ Create ATOM input file for M1D """
-    write_atom_noReFormatting(atom, temporary_directory + '/ATOM', atom_body)
-
-    """ Create ATMOS input file for M1D """
-    write_atmos_m1d(atmos, temporary_directory + '/ATMOS')
-    write_dscale_m1d(atmos, temporary_directory + '/DSCALE')
-
-    """ Go to directory and run MULTI 1D """
-    os.chdir(temporary_directory)
-
-    run_multi_exe()
-
-    """ Read M1D output if M1D run was successful """
-    if os.path.isfile('./IDL1'):
-        out = m1d('./IDL1')
-
-        """ print MULTI1D output to the temporary grid of EWs """
-        if job.output['write_ew'] > 0:
-            if job.output['write_ew'] == 1:
-                mask = np.arange(out.nline)
-            elif job.output['write_ew'] == 2:
-                mask = np.where(out.nq[:out.nline] == max(out.nq[:out.nline]))[0]
-
-            with open(job.output['file_ew'], 'a') as f:
-                for kr in mask:
-                    line = out.line[kr]
-                    f.write("%10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %10.4f %20.10f %20.10f %20.4f # '%s'\n" \
-                            % (atmos.teff, atmos.logg, atmos.feh, out.abnd, out.g[out.irad[kr]], out.ev[out.irad[kr]], \
-                               line.lam0, out.f[kr], out.weq[kr], out.weqlte[kr], np.mean(atmos.vturb), atmos.id))
-
-        """ save  MULTI1D output in a common binary file in the format for TS """
-        if job.output['write_ts'] == 1:
-            faux = open(job.output['file_4ts_aux'], 'a')
-            # append record to binary grid file
-            with np.errstate(divide='ignore'):
-                depart = np.array((out.n / out.nstar), dtype='f8')
-                # transpose to match Fortran order of things
-                # (nk, ndep)
-                depart = depart.T
-            record_len = addRec_to_NLTEbin(job.output['file_4ts'], atmos.id, out.ndep, out.nk, out.tau, depart)
-
-            faux.write(" '%s' %10.4f %10.4f %10.4f %10.4f %10.2f %10.2f %10.4f %60.0f \n" \
-                       % (atmos.id, atmos.teff, atmos.logg, atmos.feh, atmos.alpha, atmos.mass, np.mean(atmos.vturb),
-                          out.abnd, record_len))
-            faux.close()
-
-        if job.output['save_idl1'] == 0:
-            os.remove('./IDL1')
-        elif job.output['save_idl1'] == 1:
-            destin = job.output['idl1_folder'] + "/idl1.%s_%s_A(X)_%5.5f" % (
-            atmos.id, atom.element.replace(' ', ''), atom.abund)
-            shutil.move('./IDL1', destin)
-    # no IDL1 file created after the run
-    else:
-        print("IDL1 file not found for %s A(X)=%.2f" % (atmos.id, atom.abund))
-
-    out = None
-    os.chdir(common_wd)
-
-
-def run_multi_exe():
-    os.system('time ./mul23lus.x')
-
 
 def collect_output(setup, jobs, jobs_amount):
     today = datetime.date.today().strftime("%b-%d-%Y")
@@ -316,7 +101,6 @@ def collect_output(setup, jobs, jobs_amount):
         print(datetime1 - datetime0)
         print(10 * "-")
 
-
 def write_atmo_abundance(atmo, elemental_abundance_m1d: dict, new_abund_file_locaiton: str, atom_abund: float, atom_element: str):
     """
     Scales abundance according to the atmosphere. Either takes already atmospheric abundance or scaled the one in M1D
@@ -376,6 +160,9 @@ def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path
     #job = setup_multi_job(job, temporary_directory)
     atmo_path = os.path.join(atmos_path, atmo)
 
+    atmo_name = os.path.basename(atmo)
+    teff, logg, mass, vmic, feh, alpha, c, n, o, r, s = extract_atmo_info_name(atmo_name)
+
     atom_path = os.path.join(temporary_directory, "atom.my_atom")
     # random number
     random_number = str(np.random.random())
@@ -385,33 +172,35 @@ def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path
     temporary_grid_save_bin_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.bin")
 
     if use_absmet:
-        feh = 0
         absmet_file_path = choose_absmet_file(absmet_global_path, feh)
     else:
         absmet_file_path = ""
 
     completed_bool = synthesize_spectra(m3dis_path, m3d_path_run, atmo_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart, verbose)
 
+    if completed_bool:
+        marcs_model = MARCSModel(atmo_path)
+        log_tau, depart_values_nlte, atom_levels = read_m3dis_bin(os.path.join(m3d_path_run, "save", ""))
+        depart_values_nlte_interp = get_marcs_depart_interpolated(
+            log_tau, depart_values_nlte, marcs_model.lgTau5, atom_levels
+        )
+        log_tau_500 = marcs_model.lgTau5
+        record_len = add_record_to_binary_file(
+            temporary_grid_save_bin_file,
+            atmo_name,
+            log_tau_500,
+            depart_values_nlte_interp,
+        )
+        add_record_to_aux_file(
+            temporary_grid_save_aux_file,
+            atmo_name,
+            atom_abund,
+            record_len,
+        )
+    else:
+        record_len = 0
+
     # clean m3d_path_run
     shutil.rmtree(m3d_path_run)
 
-    return "done"
-
-
-    # model atom is only read once
-    atom = setup.atom
-    atmos = ModelAtmosphere()
-    atmos.read(file=job.atmo, file_format=setup.atmos_format)
-    # scale abundance with [Fe/H] of the model atmosphere
-    if np.isnan(atmos.feh):
-        atmos.feh = 0.0
-    if not atom.element.lower() == 'h':
-        atom.abund = job.abund + atmos.feh
-
-    write_atmo_abundance(atmos, setup.elemental_abundance_m1d, os.path.join(temporary_directory, "ABUND"), atom.abund, atom.element)
-    run_multi(job, atom, atmos, temporary_directory, setup.common_wd, worker.atom_body)
-
-    job_return_info = [job.output['file_ew'], job.output['file_4ts'], job.output['file_4ts_aux']]   #{'file_ew': , 'file_4ts', 'file_4ts_aux'}
-    job = None
-    # shutil.rmtree(job['tmp_wd'])
-    return job_return_info
+    return record_len

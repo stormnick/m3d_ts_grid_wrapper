@@ -29,13 +29,18 @@ def compute_tau_scale(chi, zz, axis=-1):
 
 
 def read_m3dis_bin(
-    sfolder, dims_atom_levels, file="atom_patch_001000.bin", dtype="<f4"
+    sfolder, file="atom_patch_001000.bin", dtype="<f4"
 ):
     # dims = (1, 1, dims_atmo, dims_atom_levels, 2, 1)
     # depart_values = np.memmap(
     #    sfolder + file, dtype=dtype, mode="r+", shape=dims, order="F"
     # )
     # depart_values = np.squeeze(depart_values)
+
+    with open(sfolder + "atom_patch_meta.txt", "r") as mesh:
+        mesh.readline()
+        _, _, _, _, _, dims_atom_levels, _, _ = [i for i in mesh.readline().split()]
+        dims_atom_levels = int(dims_atom_levels)
 
     with open(sfolder + "../atmos_mesh.txt", "r") as mesh:
         nx, ny, nz = [int(i) for i in mesh.readline().split()]
@@ -59,10 +64,10 @@ def read_m3dis_bin(
         log_tau = np.log10(tau)
         # print all the data in the file
 
-    return log_tau, depart_values[:, :, 1]
+    return log_tau, depart_values[:, :, 1], dims_atom_levels
 
 
-def get_marcs_depart_interpolated(log_tau, depart_values_nlte, marcs_model_lgTau5):
+def get_marcs_depart_interpolated(log_tau, depart_values_nlte, marcs_model_lgTau5, atom_levels):
     # need to interpolate log_tau to marcs_model.lgTau5
     depart_values_nlte_interp = np.zeros((marcs_model_lgTau5.size, atom_levels))
 
@@ -192,40 +197,41 @@ def extract_atmo_info_name(marcs_name):
     )
 
 
-sfolder = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data_test/input_ba_test_ba6//save/"
-# sfolder = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data_test/input_ba_test_ba6_precomp/save/"
-file = "atom_patch_001000.bin"
-dtype = "<f4"
-dims = (1, 1, 256, 6, 2, 1)
-marcs_model_name = (
-    "p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
-)
-abundance = 0.0
+if __name__ == '__main__':
+    sfolder = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data_test/input_ba_test_ba6//save/"
+    # sfolder = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data_test/input_ba_test_ba6_precomp/save/"
+    file = "atom_patch_001000.bin"
+    dtype = "<f4"
+    dims = (1, 1, 256, 6, 2, 1)
+    marcs_model_name = (
+        "p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
+    )
+    abundance = 0.0
 
-marcs_model = MARCSModel(f"input_multi3d/atmos/{marcs_model_name}")
-atom_levels = 6
+    marcs_model = MARCSModel(f"input_multi3d/atmos/{marcs_model_name}")
+    atom_levels = 6
 
-log_tau, depart_values_nlte = read_m3dis_bin(sfolder, atom_levels)
-depart_values_nlte_interp = get_marcs_depart_interpolated(
-    log_tau, depart_values_nlte, marcs_model.lgTau5
-)
-log_tau_500 = marcs_model.lgTau5
+    log_tau, depart_values_nlte = read_m3dis_bin(sfolder, atom_levels)
+    depart_values_nlte_interp = get_marcs_depart_interpolated(
+        log_tau, depart_values_nlte, marcs_model.lgTau5
+    )
+    log_tau_500 = marcs_model.lgTau5
 
-# create new binary and aux files
-bin_file = "test_output_NLTEgrid4TS_combined.bin"
-aux_file = "test_auxData_NLTEgrid4TS_combined.dat"
-description_bin = "Test"
-pointer = create_new_bin_aux_files(aux_file, bin_file, description_bin)
-record_len = add_record_to_binary_file(
-    bin_file,
-    marcs_model_name,
-    log_tau_500,
-    depart_values_nlte_interp,
-)
-add_record_to_aux_file(
-    aux_file,
-    marcs_model_name,
-    abundance,
-    pointer,
-)
-pointer = pointer + record_len
+    # create new binary and aux files
+    bin_file = "test_output_NLTEgrid4TS_combined.bin"
+    aux_file = "test_auxData_NLTEgrid4TS_combined.dat"
+    description_bin = "Test"
+    pointer = create_new_bin_aux_files(aux_file, bin_file, description_bin)
+    record_len = add_record_to_binary_file(
+        bin_file,
+        marcs_model_name,
+        log_tau_500,
+        depart_values_nlte_interp,
+    )
+    add_record_to_aux_file(
+        aux_file,
+        marcs_model_name,
+        abundance,
+        pointer,
+    )
+    pointer = pointer + record_len
