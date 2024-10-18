@@ -6,7 +6,6 @@ from time import perf_counter
 from marcs_class import MARCSModel
 import re
 
-matplotlib.use("MacOSX")
 
 # Created by storm at 16.10.24
 
