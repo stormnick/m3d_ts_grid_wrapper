@@ -139,6 +139,8 @@ def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path
     atmo_name = os.path.basename(atmo)
     teff, logg, mass, vmic, feh, alpha, c, n, o, r, s = extract_atmo_info_name(atmo_name)
 
+    atom_abund = atom_abund + feh
+
     atom_path = os.path.join(temporary_directory, "atom.my_atom")
     # random number
     date_today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
