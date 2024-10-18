@@ -8,6 +8,97 @@ from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
 import numpy as np
 import socket
+from solar_abundances import periodic_table, solar_abundances
+from solar_isotopes import solar_isotopes
+
+
+def write_abund_file(tmp_dir):
+    # file path is temp_dir + abund
+    file_path = os.path.join(tmp_dir, "abund_to_use")
+    # open file
+    with open(file_path, "w") as file:
+        # write the number of elements
+        # write the elements and their abundances
+        for element in periodic_table:
+            if element != "":
+                if element == "H" or element == "He":
+                    abundance_to_write = solar_abundances[element]
+                else:
+                    abundance_to_write = solar_abundances[element]
+                file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
+    return file_path
+
+def write_isotope_file(isotope_dir):
+    atomic_weights_path = "atomicweights.dat"
+    # check if file exists
+    if not os.path.exists(atomic_weights_path):
+        # add ../ to the path
+        atomic_weights_path = os.path.join("../", atomic_weights_path)
+    m3d_isotopes_file_path = os.path.join(isotope_dir, "isotopes")
+    # check if file exists
+    if not os.path.exists(m3d_isotopes_file_path):
+        free_isotopes = solar_isotopes
+        elements_atomic_mass_number = free_isotopes.keys()
+
+        # elements now consists of e.g. '3.006'. we want to convert 3
+        elements_atomic_number = [int(float(element.split(".")[0])) for element in elements_atomic_mass_number]
+        # count the number of each element, such that we have e.g. 3: 2, 4: 1, 5: 1
+        elements_count = {element: elements_atomic_number.count(element) for element in elements_atomic_number}
+        # remove duplicates
+        elements_atomic_number_unique = set(elements_atomic_number)
+        separator = "_"  # separator between sections in the file from NIST
+
+
+        atomic_weights = {}
+        with open(atomic_weights_path, "r") as file:
+            skip_section = True
+            current_element_atomic_number = 0
+            for line in file:
+                if line[0] != separator and skip_section:
+                    continue
+                elif line[0] == separator and skip_section:
+                    skip_section = False
+                    continue
+                elif line[0] != separator and not skip_section and current_element_atomic_number == 0:
+                    current_element_atomic_number_to_test = int(line.split()[0])
+                    if current_element_atomic_number_to_test not in elements_atomic_number_unique:
+                        skip_section = True
+                        continue
+                    current_element_atomic_number = current_element_atomic_number_to_test
+                    atomic_weights[current_element_atomic_number] = {}
+                    # remove any spaces and anything after (
+                    atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = \
+                    line[13:32].replace(" ", "").split("(")[0]
+                elif line[0] != separator and not skip_section and current_element_atomic_number != 0:
+                    atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = atomic_weight = \
+                    line[13:32].replace(" ", "").split("(")[0]
+                elif line[0] == separator and not skip_section and current_element_atomic_number != 0:
+                    current_element_atomic_number = 0
+
+        """
+        format:
+        Li    2
+           6   6.0151   0.0759
+           7   7.0160   0.9241
+        """
+
+        # open file
+
+        with open(m3d_isotopes_file_path, "w") as file:
+            # write element, then number of isotopes. next lines are isotope mass and abundance
+            current_element_atomic_number = 0
+            for element, isotope in free_isotopes.items():
+                element_atomic_number = int(float(element.split(".")[0]))
+                element_mass_number = int(float(element.split(".")[1]))
+                if current_element_atomic_number != element_atomic_number:
+                    # elements now consists of e.g. '3.006'. we want to convert 3 to and 6
+                    current_element_atomic_number = element_atomic_number
+                    file.write(
+                        f"{periodic_table[element_atomic_number]:<5}{elements_count[element_atomic_number]:>2}\n")
+
+                file.write(
+                    f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>12.8f} {isotope:>12.8f}\n")
+    return m3d_isotopes_file_path
 
 
 def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, nodes=1, slurm_script_commands=None,
@@ -121,9 +212,6 @@ def check_same_element_loc_in_two_arrays(array1, array2_float, elem1: str, elem2
     return False
 
 
-def launch_job(job):
-    return run_serial_job(setup, job)
-
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
@@ -154,8 +242,11 @@ if __name__ == '__main__':
     if not os.path.exists(setup.common_wd + '/temporary_grid/'):
         os.makedirs(setup.common_wd + '/temporary_grid/')
 
-    # copy atom file to common_wd
-    shutil.copy(os.path.join(setup.atom_path, setup.atom_id), setup.common_wd)
+    # copy atom file to common_wd and rename to atom.my_atom
+    shutil.copy(os.path.join(setup.atom_path, setup.atom_id), os.path.join(setup.common_wd, 'atom.my_atom'))
+
+    write_abund_file(setup.common_wd)
+    write_isotope_file(setup.common_wd)
 
     login_node_address = setup.login_node_address
 
@@ -210,14 +301,15 @@ if __name__ == '__main__':
 
             if not skip_fit:
                 jobs_amount += 1
-                big_future = client.scatter(jobs[one_job])
+                abund, atmo = jobs[one_job].abund, jobs[one_job].atmo
                 #big_future_setup = client.scatter(setup, broadcast=True)
                 #[big_future_setup] = client.scatter([setup], broadcast=True)
 
                 #[fut_dict] = client.scatter([setup], broadcast=True)
                 #score_guide = lambda row: expensive_computation(fut_dict, row)
-
-                future = client.submit(launch_job, big_future)
+                # job, temporary_directory, m3dis_path, convlim, iterations_max, use_absmet, absmet_global_path, hash_table_size
+                future = client.submit(run_serial_job, abund, atmo, setup.atmos_path, setup.common_wd, setup.m3d_path, setup.conv_lim,
+                                       setup.max_iterations, setup.use_absmet, setup.absmet_global_path, setup.hash_table_size)
                 futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -225,6 +317,8 @@ if __name__ == '__main__':
         print("Worker calculation done")  # when done, save values
         all_futures_combined += futures
 
-    #setup.njobs = jobs_amount
+    client.close()
 
+    #setup.njobs = jobs_amount
+    exit()
     collect_output(setup, all_futures_combined, jobs_amount)

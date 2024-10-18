@@ -1,13 +1,10 @@
 import os
 import shutil
 import numpy as np
-from atom_package import write_atom_noReFormatting
-from atmos_package import *
-from combine_grids import addRec_to_NLTEbin
-from m1d_output import m1d
 import datetime
 from dask.distributed import get_worker
 import pickle
+from run_m3dis import synthesize_spectra
 
 
 def mkdir(s):
@@ -320,7 +317,7 @@ def collect_output(setup, jobs, jobs_amount):
         print(10 * "-")
 
 
-def write_atmo_abundance(atmo: ModelAtmosphere, elemental_abundance_m1d: dict, new_abund_file_locaiton: str, atom_abund: float, atom_element: str):
+def write_atmo_abundance(atmo, elemental_abundance_m1d: dict, new_abund_file_locaiton: str, atom_abund: float, atom_element: str):
     """
     Scales abundance according to the atmosphere. Either takes already atmospheric abundance or scaled the one in M1D
     according to metallicity (except H and He). Uses only elements that were already written in the M1D ABUND file
@@ -343,9 +340,62 @@ def write_atmo_abundance(atmo: ModelAtmosphere, elemental_abundance_m1d: dict, n
                 elemental_abundance = atom_abund
             new_file_to_write.write(f"{element_name:<4}{elemental_abundance:5,.2f}\n")
 
+def choose_absmet_file(absmet_file_global_path, metallicity):
+    # check if feh is almost 0
+    #absmet_file_global_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/"
+    #absmet_file_global_path = "/Users/storm/PhD_2022-2025/m3dis_useful_stuff/absmet_files/"
+    if np.abs(metallicity) < 0.01:
+        # /mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00
+        absmet_file = f"OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+    # check if feh is almost -1 or -0.5
+    elif np.abs(metallicity + 1) < 0.01 or np.abs(metallicity + 0.5) < 0.01:
+        absmet_file = f"m-1.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=T"
+    # check if feh is almost -2
+    elif np.abs(metallicity + 2) < 0.01:
+        absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+    # check if feh is almost -3
+    elif np.abs(metallicity + 3) < 0.01:
+        absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+    # check if feh is almost -4
+    elif np.abs(metallicity + 4) < 0.01:
+        absmet_file = f"OPACITIES/M-4.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+    # check if feh is almost +0.5
+    elif np.abs(metallicity - 0.5) < 0.01:
+        absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+        absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}'  absmet_big_end=F"
+    #    &composition_params absmet_file='/u/nisto/data/absmet//m1/metals.x01' absmet_big_end=T /
+    # absmet_file = f"absmet_file='{os.path.join(self.departure_file_path, '')}' absmet_big_end=T"
+    return absmet_file
 
-def run_serial_job(job, temporary_directory):
-    job = setup_multi_job(job, temporary_directory)
+def run_serial_job(atom_abund, atmo, atmos_path, temporary_directory, m3dis_path, convlim, iterations_max, use_absmet, absmet_global_path, hash_table_size, use_precomputed_depart=False, verbose=True):
+    #job = setup_multi_job(job, temporary_directory)
+    atmo_path = os.path.join(atmos_path, atmo)
+
+    atom_path = os.path.join(temporary_directory, "atom.my_atom")
+    # random number
+    random_number = str(np.random.random())
+    m3d_path_run = os.path.join(temporary_directory, "temp_directory_for_m3d", random_number)
+    os.makedirs(m3d_path_run)
+    temporary_grid_save_aux_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.txt")
+    temporary_grid_save_bin_file = os.path.join(temporary_directory, "temporary_grid", f"{random_number}.bin")
+
+    if use_absmet:
+        feh = 0
+        absmet_file_path = choose_absmet_file(absmet_global_path, feh)
+    else:
+        absmet_file_path = ""
+
+    completed_bool = synthesize_spectra(m3dis_path, m3d_path_run, atmo_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart, verbose)
+
+    # clean m3d_path_run
+    shutil.rmtree(m3d_path_run)
+
+    return "done"
 
 
     # model atom is only read once

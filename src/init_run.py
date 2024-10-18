@@ -1,10 +1,8 @@
 import sys
 import os
 import numpy as np
-from atom_package import model_atom
 import shutil
 # local
-from atmos_package import ModelAtmosphere, write_atmos_m1d, write_dscale_m1d
 import pickle
 from configparser import ConfigParser
 import shutil
@@ -23,6 +21,7 @@ class SerialJob:
         self.atmo: str = None
         self.abund: float = None
         self.output = {}
+
 
 
 # a setup of the run to compute NLTE grid, e.g. Mg over all MARCS grid
@@ -49,6 +48,11 @@ class Setup:
         self.slurm_time_limit_hours = config.getint('Parameters', 'slurm_time_limit_hours')
         self.slurm_nodes = config.getint('Parameters', 'slurm_nodes')
         self.login_node_address = config.get('Parameters', 'login_node_address')
+        self.use_absmet = self._convert_string_to_bool(config.get('Parameters', 'use_absmet'))
+        self.absmet_global_path = config.get('Parameters', 'absmet_global_path')
+        self.hash_table_size = config.getint('Parameters', 'hash_table_size')
+        self.max_iterations = config.getint('Parameters', 'max_iterations')
+        self.conv_lim = config.getfloat('Parameters', 'conv_lim')
 
 
         self.slurm_cluster = self._convert_string_to_bool(self.slurm_cluster)
