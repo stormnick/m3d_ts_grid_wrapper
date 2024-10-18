@@ -157,7 +157,7 @@ def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: i
     cluster = SLURMCluster(
         queue=slurm_partition,                      # Which queue/partition to submit jobs to
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
-        memory=f"{memory_per_core_gb * cores_per_job}GB",         # Amount of memory per job (also per node)
+        memory=f"{memory_per_core_gb * cores_per_job * 1000}",         # Amount of memory per job (also per node)
         job_script_prologue=script_commands,     # Additional commands to run before starting dask worker
         walltime=time_limit_string                      # Time limit for each job
     )
