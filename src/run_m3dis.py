@@ -51,10 +51,10 @@ def run_m3dis(mpi_cores, temp_path, input_in, stderr, stdout):
     return pr1, stderr_bytes
 
 
-def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart=False, verbose=False):
+def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart=False, verbose=False, precomputed_depart_path=None):
     atmo_param = f"atmos_format='Marcs'"
-    if use_precomputed_depart:
-        precomputed_depart = f"precomputed_depart='{os.path.join(temp_path, '../precomputed_depart', '')}'"
+    if use_precomputed_depart and precomputed_depart_path is not None:
+        precomputed_depart = f"precomputed_depart='{precomputed_depart_path}'"
     else:
         precomputed_depart = ""
     atom_params = (f"&atom_params        atom_file='{atom_path}' "
@@ -106,7 +106,7 @@ def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, co
 
     return output
 
-def synthesize_spectra(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart, verbose):
+def synthesize_spectra(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart, verbose, precomputed_depart_path=None):
     try:
         # clean temp directory
         save_file_dir = os.path.join(temp_path, "save")
@@ -114,7 +114,7 @@ def synthesize_spectra(m3dis_path, temp_path, atmo_model_path, atom_path, atom_a
             # just in case it fails, so that it doesn't reuse the old files
             shutil.rmtree(save_file_dir)
         logging.debug("Running m3dis")
-        output = call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart=use_precomputed_depart, verbose=verbose)
+        output = call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart=use_precomputed_depart, verbose=verbose, precomputed_depart_path=precomputed_depart_path)
         if "errors" in output:
             print(output["errors"], "m3dis failed")
             return False
