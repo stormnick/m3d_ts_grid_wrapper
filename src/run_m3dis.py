@@ -53,18 +53,25 @@ def run_m3dis(mpi_cores, temp_path, input_in, stderr, stdout):
 
 def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, convlim, iterations_max, use_absmet, absmet_file_path, hash_table_size, use_precomputed_depart=False, verbose=False, precomputed_depart_path=None):
     atmo_param = f"atmos_format='Marcs'"
-    if use_precomputed_depart and precomputed_depart_path is not None:
-        precomputed_depart = f"precomputed_depart='{precomputed_depart_path}'"
-    else:
-        precomputed_depart = ""
-    atom_params = (f"&atom_params        atom_file='{atom_path}' "
-                   f"convlim={convlim} use_atom_abnd=F exclude_trace_cont=T exclude_from_line_list=T "
-                   f"{precomputed_depart} abundance={atom_abund:.2f}/\n")
 
     if use_absmet:
         absmet_file = absmet_file_path
     else:
         absmet_file = ""
+
+    if use_precomputed_depart and precomputed_depart_path is not None:
+        precomputed_depart = f"precomputed_depart='{precomputed_depart_path}'"
+        composition_params = ""
+        spectrum_params = ""
+    else:
+        precomputed_depart = ""
+        composition_params = f"&composition_params isotope_file='{temp_path}/../../isotopes' abund_file='{temp_path}/../../abund_to_use' {absmet_file}/\n"
+        spectrum_params = "&spectrum_params    daa=0.1 aa_blue=5000 aa_red=5001 /\n"
+
+    atom_params = (f"&atom_params        atom_file='{atom_path}' "
+                   f"convlim={convlim} use_atom_abnd=F exclude_trace_cont=T exclude_from_line_list=T "
+                   f"{precomputed_depart} abundance={atom_abund:.2f}/\n")
+
 
     # 0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
     # turbospectrum angles
@@ -74,8 +81,8 @@ def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, co
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims=1 save_atmos=T atmos_file='{atmo_model_path}' {atmo_param}/\n{atom_params}\
 &m3d_params         decouple_continuum=T verbose=2 n_nu=1 maxiter={iterations_max}/\n\
-&spectrum_params    daa=0.1 aa_blue=5000 aa_red=5001 /\n\
-&composition_params isotope_file='{temp_path}/../../isotopes' abund_file='{temp_path}/../../abund_to_use' {absmet_file}/\n\
+{spectrum_params}\
+{composition_params}\
 &task_list_params   hash_table_size={hash_table_size} /\n")
 
     if verbose:

@@ -384,9 +384,9 @@
             range: {x: [-1, 13], y: [0, 11]}
         },
         Sun: {
-            x: [0, 1, 2, 3, 4, 4.5, 6, 7, 7.3, 9, 10, 11],
-            y: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            range: {x: [-1, 11.5], y: [0, 5]}
+            x: [0, 3, 7, 11],
+            y: [1, 1, 1, 1],
+            range: {x: [-2, 11.5], y: [0, 5]}
         },
         WolbergAlfy2: {
             x: [0.0196, 0.1090, 0.1297, 0.2340, 0.2526, 0.3003, 0.3246, 0.3484, 0.3795, 0.4289,
@@ -484,10 +484,21 @@
         .then(result => {
             // Handle the result from the server
             console.log(result);
+
+            const plotContainer = document.getElementById('plot-container');
+            plotContainer.innerHTML = '';
+
+            // Parse the figure data
+            var figure = JSON.parse(result.data);
+
+            // Reconstruct the plot using the received data and layout
+            Plotly.newPlot('plot-container', figure.data, figure.layout);
         });
     });
 
     </script>
+
+    <div id="plot-container"></div>
 
 </body>
 
