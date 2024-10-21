@@ -62,6 +62,14 @@
             </select>
         </div>
         <div>
+             <div class="col-md-2">
+                <label for="abund">Abundance</label>
+            </div>
+            <div class="col-md-2">
+                <input type="number" class="form-control" id="abund" name="abund" value="2.11">
+            </div>
+        </div>
+        <div>
             <button id="compute">Compute</button>
         </div>
     </div>
@@ -473,12 +481,13 @@
         // Collect data from the graph
         var x_data = figurecontainer.data[0].x;
         var y_data = figurecontainer.data[0].y;
+        var abund = document.getElementById('abund').value;
 
         // Send data to the server
         fetch('/compute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ x: x_data, y: y_data })
+            body: JSON.stringify({ x: x_data, y: y_data, abund: abund})
         })
         .then(response => response.json())
         .then(result => {

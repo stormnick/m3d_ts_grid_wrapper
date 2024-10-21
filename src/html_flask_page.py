@@ -17,6 +17,7 @@ def index():
 @app.route('/compute', methods=['POST'])
 def compute():
     data = request.get_json()
+    abund = float(data['abund'])
     x_values = data['x']
     y_values = data['y']
 
@@ -29,7 +30,13 @@ def compute():
 
     print(new_y_values)
     change_depart_coefficient(save_path, new_y_values, np.ones_like(atmo_dimension), atmo_dimension, atom_levels)
-    xx_lte, yy_lte, xx_nlte, yy_nlte = rerun_new_depart_coefficient("/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/", "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/test_precomp/", "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod", "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/input_ba_test_ba6/atom.txt", 2.11, "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/input_ba_test_ba6/", 4553, 4555)
+    xx_lte, yy_lte, xx_nlte, yy_nlte = rerun_new_depart_coefficient("/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/",
+                                                                    "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/test_precomp/",
+                                                                    "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
+                                                                    "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/input_ba_test_ba6/atom.txt",
+                                                                    abund,
+                                                                    "/Users/storm/PycharmProjects/m3d_ts_grid_wrapper/src/input_ba_test_ba6/",
+                                                                    4553.6, 4554.5)
     fig = create_plot_data(xx_lte, yy_lte, xx_nlte, yy_nlte)
     return jsonify({"data": fig.to_json()})
     # Process the data as needed
