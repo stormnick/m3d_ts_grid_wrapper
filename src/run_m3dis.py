@@ -58,11 +58,12 @@ def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, co
         absmet_file = absmet_file_path
     else:
         absmet_file = ""
-
+    ctrb_func = ""
     if use_precomputed_depart and precomputed_depart_path is not None:
         precomputed_depart = f"precomputed_depart='{precomputed_depart_path}'"
-        composition_params = ""
+        composition_params = "&line_mask          cntrbf_lines=1/\n"
         spectrum_params = ""
+        ctrb_func = "n_cntrbf=1"
     else:
         precomputed_depart = ""
         composition_params = f"&composition_params isotope_file='{temp_path}/../../isotopes' abund_file='{temp_path}/../../abund_to_use' {absmet_file}/\n"
@@ -70,7 +71,7 @@ def call_m3dis(m3dis_path, temp_path, atmo_model_path, atom_path, atom_abund, co
 
     atom_params = (f"&atom_params        atom_file='{atom_path}' "
                    f"convlim={convlim} use_atom_abnd=F exclude_trace_cont=T exclude_from_line_list=T "
-                   f"{precomputed_depart} abundance={atom_abund:.2f}/\n")
+                   f"{precomputed_depart} abundance={atom_abund:.2f} {ctrb_func}/\n")
 
 
     # 0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000

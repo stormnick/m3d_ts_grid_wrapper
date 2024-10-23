@@ -37,7 +37,7 @@
             margin: 0 !important;
         }
         /* This is necessary to make Plotly points selectable. */
-        .scatterlayer .trace:last-child .points path {
+        .scatterlayer .trace .points path {
             pointer-events: all;
         }
     </style>
@@ -205,7 +205,7 @@
         return arr;
     }
 
-    function sortHandles() {
+    function sortHandles(handles) {
         var len = handles.length;
         handles.sort(function(a,b) {
             return a.x-b.x;
@@ -226,14 +226,22 @@
         return {x: x, y: y, xvis: xvis, yvis: yvis, xmin: xmin, xmax: xmax};
     }
 
-    function updateFigure() {
-        var sortedhandles = sortHandles();
-        var xx = linspace(sortedhandles.xmin, sortedhandles.xmax, 1000);
+    function get_xx_yy(handles) {
+        var sortedhandles = sortHandles(handles);
+        var xx = linspace(sortedhandles.xmin, sortedhandles.xmax, 100);
         var yy = interpolateCubicHermite(xx, sortedhandles.x, sortedhandles.y, interpolationmethod, interpolationtension);
-        Plotly.restyle(figurecontainer, {'x': [xx, sortedhandles.xvis], 'y': [yy, sortedhandles.yvis]});
+        return {xx: xx, yy: yy, sortedhandles: sortedhandles};
     }
 
-    function updatePointHandles() {
+    function updateFigure() {
+        var coordinates_lower = get_xx_yy(handles_lower);
+        var coordinates_upper = get_xx_yy(handles_upper);
+        //Plotly.restyle(figurecontainer, {'x': [coordinates_upper.xx, coordinates_upper.sortedhandles.xvis], 'y': [coordinates_upper.yy, coordinates_upper.sortedhandles.yvis]});
+        Plotly.restyle(figurecontainer, {'x': [coordinates_lower.xx, coordinates_lower.sortedhandles.xvis, coordinates_upper.xx, coordinates_upper.sortedhandles.xvis],
+                                         'y': [coordinates_lower.yy, coordinates_lower.sortedhandles.yvis, coordinates_upper.yy, coordinates_upper.sortedhandles.yvis]});
+    }
+
+    function updatePointHandles(handles, points) {
         for (var i=0, p=0, len=handles.length; i<len; i++) {
             if (handles[i].type != 'hidden') {
                 points[p++].handle = handles[i];
@@ -241,21 +249,13 @@
         }
     }
 
-    function destroyHandle(handle) {
+    function destroyHandle(handles, handle) {
         var i = handles.indexOf(handle);
         handles.splice(i,1);
         updateFigure();
     }
 
-    function poofHandle(handle) {
-        Plotly.d3.select(points[0]).transition().duration(500)
-            .attr("transform", "translate(" + xspawn + "," + yspawn + ") scale(0)")
-            .each("end", function() {
-                destroyHandle(handle);
-            });
-    }
-
-    function addHandle(type, x, y) {
+    function addHandle(handles, type, x, y) {
         if (type == 'spawn') {
             x = figurecontainer._fullLayout.xaxis.p2l(xspawn);
             y = figurecontainer._fullLayout.yaxis.p2l(yspawn);
@@ -269,7 +269,7 @@
         return newhandle;
     }
 
-    function startDragBehavior() {
+    function startDragBehavior(handles, points) {
         var d3 = Plotly.d3;
         var drag = d3.behavior.drag();
         drag.origin(function() {
@@ -281,7 +281,7 @@
             if (this.handle.type != 'spawn') {
                 trash.setAttribute("display", "inline");
                 trash.style.fill = "rgba(0,0,0,.2)";
-                destroyHandle(points[0].handle);
+                destroyHandle(handles, points[0].handle);
             }
         });
         drag.on("drag", function() {
@@ -304,17 +304,18 @@
             updateFigure();
         });
         drag.on("dragend", function() {
-            if (this.handle.x < firstx) destroyHandle(this.handle);
-            addHandle('spawn');
+            if (this.handle.x < firstx) destroyHandle(handles, this.handle);
+            addHandle(handles, 'spawn');
             updateFigure();
-            updatePointHandles();
+            updatePointHandles(handles, points);
             trash.setAttribute("display", "none");
             d3.select(".scatterlayer .trace:last-of-type .points path:last-of-type").call(drag);
         });
-        d3.selectAll(".scatterlayer .trace:last-of-type .points path").call(drag);
+
+    d3.selectAll(".scatterlayer .trace .points path").call(drag);
     }
 
-    function putOutTheTrash() {
+    function putOutTheTrash(pointscontainer) {
         var trashsize = trash.getAttribute("width");
         pointscontainer.parentNode.insertBefore(trash, pointscontainer);
         trash.setAttribute("transform", "translate(" + (xspawn - trashsize/2) + "," + (yspawn - trashsize/2 + 5) + ")");
@@ -323,7 +324,7 @@
 
     var layout = {
         autosize: true,
-        showlegend: false,
+        showlegend: true,
         margin: {
             t: 20,
             r: 10,
@@ -344,14 +345,28 @@
         font: {size: 16}
     };
 
-    var interpolatedline = {
+    var interpolatedline_lower = {
         x: [1, 8],
         y: [1, 40],
         type: 'scatter',
         mode: 'lines',
-        hoverinfo: 'none'
+        hoverinfo: 'none',
+        line: {
+            color: 'black'
+        },
+        name: 'lower'
     };
-    var breakpoints = {
+    var interpolatedline_upper = {
+        x: [1, 8],
+        y: [1, 40],
+        type: 'scatter',
+        mode: 'lines',
+        line: {
+            color: 'red'
+        },
+        name: 'upper'
+    };
+    var breakpoints_lower = {
         x: [1, 8],
         y: [5, 30],
         type: 'scatter',
@@ -360,87 +375,87 @@
         marker: {
             size: 20,
             symbol: "circle-open-dot",
-            color: '#b00',
+            color: 'black',
             line: {
                 width: 2
             }
         },
-        hoverinfo: 'none'
+        hoverinfo: 'none',
+        // dont want to be in the legen
+        showlegend: false
+    };
+    var breakpoints_upper = {
+        x: [1, 8],
+        y: [5, 30],
+        type: 'scatter',
+        cliponaxis: false,
+        mode: 'markers',
+        marker: {
+            size: 20,
+            symbol: "circle-open-dot",
+            color: 'red',
+            line: {
+                width: 2
+            }
+        },
+        hoverinfo: 'upper',
+        showlegend: false
     };
 
-    /*
-    Sources for monotonic spline test data:
-    Akima, Wolberg-Alfy:  Wolberg & Alfy (2000), "An energy-minimization framework for monotonic cubic spline interpolation",
-                                            doi:10.1016/S0377-0427(01)00506-4
-    Hussain:  Hussain et al. (2011) "Shape preserving rational cubic spline for positive and convex data",
-                                            doi:10.1016/j.eij.2011.10.002
-    */
-    var testdata = {
-        Akima: {
-            x: [0, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15],
-            y: [10, 10, 10, 10, 10, 10, 10.5, 15, 50, 60, 85],
-            range: {x: [-1, 16], y: [0, 90]}
-        },
-        Hussain1: {
-            x: [-9, -8, -4, 0, 4, 8, 9],
-            y: [7, 5, 3.5, 3.25, 3.5, 5, 7],
-            range: {x: [-11, 10], y: [3, 8]}
-        },
-        Hussain2: {
-            x: [1, 1.5, 1.75, 2, 2.5, 3, 5, 10, 10.5, 11, 12],
-            y: [10, 7, 5, 2.5, 1, 0.6, 0.4, 1, 3, 5, 9],
-            range: {x: [-1, 13], y: [0, 11]}
-        },
+    var testdata_lower = {
         Sun: {
-            x: [0, 3, 7, 11],
+            x: [-6.55, -3, 0, 1.78],
             y: [1, 1, 1, 1],
-            range: {x: [-2, 11.5], y: [0, 5]}
+            range: {x: [-8.55, 2.28], y: [0, 5]}
         },
         WolbergAlfy2: {
             x: [0.0196, 0.1090, 0.1297, 0.2340, 0.2526, 0.3003, 0.3246, 0.3484, 0.3795, 0.4289,
                 0.4603, 0.4952, 0.5417, 0.6210, 0.6313, 0.6522, 0.6979, 0.7095, 0.8318, 0.8381],
             y: [4, 4.5, 14, 16, 24, 30, 28, 35, 36, 38, 39, 40, 30, 23, 20, 19, 18, 5, 4, 3],
             range: {x: [-0.1, 0.85], y: [0, 43]}
+        }
+    }
+    var testdata_upper = {
+        Sun: {
+            x: [-6.55, -4, -1, 1.78],
+            y: [2, 2, 2, 1],
+            range: {x: [-8.55, 2.28], y: [0, 5]}
         },
-        monotonicMotivation: {
-            x: [1, 2, 3.6, 4, 5.8, 6, 10],
-            y: [6, 2, 2, 7, 7, 1, 9],
-            range: {x: [0, 10.3], y: [0, 10]}
-        },
-        cardinalFail: {
-            x: [1, 2, 3, 4, 5, 6, 6.5, 7, 7.5, 8, 8.5],
-            y: [0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0],
-            range: {x: [0, 9], y: [0, 6]}
-        },
-        endpointsOnly: {
-            x: [1, 10],
-            y: [1, 1],
-            range: {x: [0, 10.3], y: [0, 10]}
-        },
-        hiddenDemo: {
-            x: [1, 2, 6, 7, 8],
-            y: [2, 1, 4, 0, 0],
-            range: {x: [0, 8.2], y: [-1, 5]}
-        },
+        WolbergAlfy2: {
+            x: [0.0196, 0.1090, 0.1297, 0.2340, 0.2526, 0.3003, 0.3246, 0.3484, 0.3795, 0.4289,
+                0.4603, 0.4952, 0.5417, 0.6210, 0.6313, 0.6522, 0.6979, 0.7095, 0.8318, 0.8381],
+            y: [5, 5, 15, 17, 25, 31, 29, 36, 37, 39, 40, 41, 31, 24, 21, 20, 19, 6, 5, 4],
+            range: {x: [-0.1, 0.85], y: [0, 43]}
+        }
     }
 
     var figurecontainer = document.getElementById("figurecontainer");
-    Plotly.plot(figurecontainer, [interpolatedline, breakpoints], layout, {staticPlot: true});
+    Plotly.plot(figurecontainer, [interpolatedline_lower, breakpoints_lower, interpolatedline_upper, breakpoints_upper], layout, {staticPlot: true});
 
     var pointscontainer = figurecontainer.querySelector(".scatterlayer .trace:last-of-type .points");
-    var points = pointscontainer.getElementsByTagName("path");
+    var pointscontainers = figurecontainer.querySelectorAll(".scatterlayer .trace .points");
+    console.log(pointscontainers);
+
+    var pointscontainer_lower = pointscontainers[1]; // First trace
+    var pointscontainer_upper = pointscontainers[3]; // Second trace
+    console.log(pointscontainer_lower);
+    console.log(pointscontainer_upper);
+
+    var points_lower = pointscontainer_lower.getElementsByTagName("path");
+    var points_upper = pointscontainer_upper.getElementsByTagName("path");
     var trash = document.getElementById("trash");
     var xspawn = 50, yspawn = 50;       // pixel coordinates of the spawn handle
-    putOutTheTrash();
+    putOutTheTrash(pointscontainer_lower);
+    putOutTheTrash(pointscontainer_upper);
 
     var firstx;         // Position of the leftmost breakpoint. Drag a handle beyond this to delete it.
-    var handles = [];   // the global list of handles
+    var handles_lower = [];
+    var handles_upper = [];
 
     var interpolationmethod = 'FritschButland'; // Linear, FiniteDifference, Cardinal, FritschCarlson, FritschButland, Steffen
     var interpolationtension = 0.5;             // [0,1], only used for Cardinal splines
     var testdataDropdown = document.getElementById("testdataDropdown");
     testdataDropdown.selectedIndex = 3;
-
 
     /* We have 4 different types of handles:
         normal      standard draggable handle
@@ -451,26 +466,28 @@
     testdataDropdown.onchange = function() {
         var datasource = testdataDropdown.options[testdataDropdown.selectedIndex].value;
         Plotly.relayout(figurecontainer, {
-            'xaxis.range': testdata[datasource].range.x,
-            'yaxis.range': testdata[datasource].range.y
+            'xaxis.range': testdata_lower[datasource].range.x,
+            'yaxis.range': testdata_lower[datasource].range.y
         })
         var type;
-        firstx = testdata[datasource].x[0];
-        handles = [];
-        addHandle('spawn');
-        for (var i=0, len=testdata[datasource].x.length; i<len; i++) {
-            if (datasource == "endpointsOnly") {
-                type = "endpoint";
-            } else if (datasource == "hiddenDemo") {
-                type = i <= 1 ? "hidden" : i == len-1 ? "endpoint" : "normal";
-            } else {
-                type = i == 0 || i == len-1 ? "endpoint" : "normal";
-            }
-            addHandle(type, testdata[datasource].x[i], testdata[datasource].y[i]);
+        firstx = testdata_lower[datasource].x[0];
+        handles_lower = [];
+        handles_upper = [];
+        addHandle(handles_lower, 'spawn');
+        addHandle(handles_upper, 'spawn');
+        for (var i=0, len=testdata_lower[datasource].x.length; i<len; i++) {
+            type = i == 0 || i == len-1 ? "endpoint" : "normal";
+            addHandle(handles_lower, type, testdata_lower[datasource].x[i], testdata_lower[datasource].y[i]);
+        }
+        for (var i=0, len=testdata_upper[datasource].x.length; i<len; i++) {
+            type = i == 0 || i == len-1 ? "endpoint" : "normal";
+            addHandle(handles_upper, type, testdata_upper[datasource].x[i], testdata_upper[datasource].y[i]);
         }
         updateFigure();
-        updatePointHandles();
-        startDragBehavior();
+        updatePointHandles(handles_lower, points_lower);
+        updatePointHandles(handles_upper, points_upper);
+        startDragBehavior(handles_lower, points_lower);
+        startDragBehavior(handles_upper, points_upper);
     }
 
     // load the default test data
@@ -479,15 +496,17 @@
     // Handle "Compute" button click
     document.getElementById('compute').addEventListener('click', function(){
         // Collect data from the graph
-        var x_data = figurecontainer.data[0].x;
-        var y_data = figurecontainer.data[0].y;
+        var x_data_lower = figurecontainer.data[0].x;
+        var y_data_lower = figurecontainer.data[0].y;
+        var x_data_upper = figurecontainer.data[2].x;
+        var y_data_upper = figurecontainer.data[2].y;
         var abund = document.getElementById('abund').value;
 
         // Send data to the server
         fetch('/compute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ x: x_data, y: y_data, abund: abund})
+            body: JSON.stringify({x_lower: x_data_lower, y_lower: y_data_lower, x_upper: x_data_upper, y_upper: y_data_upper, abund: abund})
         })
         .then(response => response.json())
         .then(result => {
@@ -502,12 +521,22 @@
 
             // Reconstruct the plot using the received data and layout
             Plotly.newPlot('plot-container', figure.data, figure.layout);
+
+            const plotContainer2 = document.getElementById('plot-container2');
+            plotContainer2.innerHTML = '';
+
+            // Parse the figure data
+            var figure2 = JSON.parse(result.data2);
+
+            // Reconstruct the plot using the received data and layout
+            Plotly.newPlot('plot-container2', figure2.data, figure2.layout);
         });
     });
 
     </script>
 
     <div id="plot-container"></div>
+    <div id="plot-container2"></div>
 
 </body>
 
